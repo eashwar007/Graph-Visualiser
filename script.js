@@ -103,8 +103,8 @@ function drawTree(coords, edges, n) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw edges
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#8e24aa';
+    ctx.lineWidth = 3;
     for (let [u, v] of edges) {
         ctx.beginPath();
         ctx.moveTo(coords[u].x, coords[u].y);
@@ -118,11 +118,11 @@ function drawTree(coords, edges, n) {
 
         // Node circle
         ctx.beginPath();
-        ctx.fillStyle = '#2e7d32';
-        ctx.arc(coords[i].x, coords[i].y, 20, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ab47bc';
+        ctx.arc(coords[i].x, coords[i].y, 22, 0, 2 * Math.PI);
         ctx.fill();
-        ctx.strokeStyle = '#222';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#6a1b9a';
+        ctx.lineWidth = 3;
         ctx.stroke();
 
         // Node number
@@ -135,35 +135,100 @@ function drawTree(coords, edges, n) {
 }
 
 function visualizeTree() {
-    const errorElement = document.getElementById('error');
-    errorElement.textContent = '';
+  const nodes = parseInt(document.getElementById("nodes").value);
+  const root = parseInt(document.getElementById("root").value);
+  const edgesInput = document.getElementById("edges").value.trim();
+  const errorEl = document.getElementById("error");
+  const canvas = document.getElementById("treeCanvas");
+  const ctx = canvas.getContext("2d");
 
-    const n = parseInt(document.getElementById('nodes').value);
-    const root = parseInt(document.getElementById('root').value);
-    const edgesInput = document.getElementById('edges').value.trim();
-    const edgePairs = edgesInput ? edgesInput.split(',').map(pair => pair.trim().split(/\s+/).map(Number)) : [];
+  errorEl.textContent = "";
 
-    if (!n || isNaN(n) || !root || isNaN(root)) {
-        errorElement.textContent = "Please enter valid number of nodes and root";
-        return;
+  // Resize canvas dynamically
+  canvas.width = canvas.parentElement.clientWidth - 40;
+  canvas.height = canvas.parentElement.clientHeight - 40;
+
+  // Validation
+  if (isNaN(nodes) || isNaN(root) || !edgesInput) {
+    errorEl.textContent = "⚠️ Please enter valid nodes, root, and edges.";
+    return;
+  }
+
+  if (nodes > 15) {
+    errorEl.textContent = "⚠️ Too many nodes! Please enter 15 or fewer.";
+    return;
+  }
+
+  // Build adjacency list
+  const edges = edgesInput.split(",").map(e => e.trim().split(" ").map(Number));
+  const adj = Array.from({ length: nodes + 1 }, () => []);
+  for (let [u, v] of edges) {
+    adj[u].push(v);
+    adj[v].push(u);
+  }
+
+  // BFS to assign levels
+  const levels = {};
+  const visited = new Set();
+  const queue = [[root, 0]];
+  visited.add(root);
+  while (queue.length) {
+    const [node, depth] = queue.shift();
+    if (!levels[depth]) levels[depth] = [];
+    levels[depth].push(node);
+    for (let nei of adj[node]) {
+      if (!visited.has(nei)) {
+        visited.add(nei);
+        queue.push([nei, depth + 1]);
+      }
     }
+  }
 
-    const error = validateTree(n, edgePairs, root);
-    if (error) {
-        errorElement.textContent = error;
-        return;
+  // Drawing
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = "16px Segoe UI";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const depthKeys = Object.keys(levels).map(Number);
+  const vSpacing = canvas.height / (depthKeys.length + 1);
+  const nodePositions = {};
+
+  depthKeys.forEach((depth, i) => {
+    const nodesAtLevel = levels[depth];
+    const hSpacing = canvas.width / (nodesAtLevel.length + 1);
+    nodesAtLevel.forEach((node, j) => {
+      const x = (j + 1) * hSpacing;
+      const y = (i + 1) * vSpacing;
+      nodePositions[node] = [x, y];
+    });
+  });
+
+  // Draw edges
+  ctx.strokeStyle = "#8e24aa";
+  ctx.lineWidth = 3;
+  for (let [u, v] of edges) {
+    if (nodePositions[u] && nodePositions[v]) {
+      ctx.beginPath();
+      ctx.moveTo(...nodePositions[u]);
+      ctx.lineTo(...nodePositions[v]);
+      ctx.stroke();
     }
+  }
 
-    const { coords, directed } = assignCoordinates(n, edgePairs, root);
-
-    // Flatten directed adjacency into edge list
-    const directedEdges = [];
-    for (let u = 1; u <= n; u++) {
-        for (let v of directed[u]) {
-            directedEdges.push([u, v]);
-        }
-    }
-
-    drawTree(coords, directedEdges, n);
+  // Draw nodes
+  for (let node in nodePositions) {
+    const [x, y] = nodePositions[node];
+    ctx.beginPath();
+    ctx.arc(x, y, 24, 0, Math.PI * 2);
+    ctx.fillStyle = "#ab47bc";
+    ctx.fill();
+    ctx.strokeStyle = "#6a1b9a";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = "white";
+    ctx.fillText(node, x, y);
+  }
 }
+
 
