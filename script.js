@@ -42,38 +42,49 @@ function validateTree(n, edges, root) {
 }
 
 function assignCoordinates(n, edges, root) {
+    // Build undirected adjacency
     const adjList = Array.from({ length: n + 1 }, () => []);
     for (let [u, v] of edges) {
         adjList[u].push(v);
+        adjList[v].push(u); // undirected for traversal
     }
 
-    const coords = Array(n + 1).fill().map(() => ({ x: 0, y: 0 }));
+    // Rebuild a directed tree (root → children)
+    const directed = Array.from({ length: n + 1 }, () => []);
     const levels = Array(n + 1).fill(-1);
-    const queue = [[root, 0]];
+    const queue = [root];
     levels[root] = 0;
     let maxLevel = 0;
 
     while (queue.length > 0) {
-        const [node, level] = queue.shift();
-        maxLevel = Math.max(maxLevel, level);
-        for (let child of adjList[node]) {
-            levels[child] = level + 1;
-            queue.push([child, level + 1]);
+        const node = queue.shift();
+        for (let neighbor of adjList[node]) {
+            if (levels[neighbor] === -1) {
+                levels[neighbor] = levels[node] + 1;
+                maxLevel = Math.max(maxLevel, levels[neighbor]);
+                directed[node].push(neighbor);  // orient edge root → child
+                queue.push(neighbor);
+            }
         }
     }
 
+    // Count nodes per level
     const nodesPerLevel = Array(maxLevel + 1).fill(0);
     for (let i = 1; i <= n; i++) {
         if (levels[i] >= 0) nodesPerLevel[levels[i]]++;
     }
 
+    // Resize canvas
     const levelWidths = nodesPerLevel.map(count => count * 80);
     const canvasWidth = Math.max(...levelWidths, 800);
     const canvasHeight = (maxLevel + 1) * 120;
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
 
+    // Assign coordinates
+    const coords = Array(n + 1).fill().map(() => ({ x: 0, y: 0 }));
     const levelOffsets = Array(maxLevel + 1).fill(0);
+
     for (let i = 1; i <= n; i++) {
         if (levels[i] >= 0) {
             const level = levels[i];
@@ -84,8 +95,9 @@ function assignCoordinates(n, edges, root) {
         }
     }
 
-    return coords;
+    return { coords, directed };
 }
+
 
 function drawTree(coords, edges, n) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -142,6 +154,16 @@ function visualizeTree() {
         return;
     }
 
-    const coords = assignCoordinates(n, edgePairs, root);
-    drawTree(coords, edgePairs, n);
+    const { coords, directed } = assignCoordinates(n, edgePairs, root);
+
+    // Flatten directed adjacency into edge list
+    const directedEdges = [];
+    for (let u = 1; u <= n; u++) {
+        for (let v of directed[u]) {
+            directedEdges.push([u, v]);
+        }
+    }
+
+    drawTree(coords, directedEdges, n);
 }
+
