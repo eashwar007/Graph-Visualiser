@@ -52,7 +52,32 @@ input:focus, textarea:focus {
   border-color: #8e24aa;
   box-shadow: 0 0 12px rgba(142, 36, 170, 0.25);
   outline: none;
-  outline: none;
+}
+
+/* Options section */
+.options {
+  margin: 20px 0;
+}
+
+/* Checkbox styling */
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  margin: 12px 0;
+  cursor: pointer;
+  font-size: 14px;
+  color: #4a148c;
+}
+
+.checkbox-container input[type="checkbox"] {
+  margin: 0;
+  margin-right: 10px;
+  width: auto;
+  padding: 0;
+}
+
+.checkmark {
+  margin-left: 8px;
 }
 
 /* Make edges textarea scrollable */
@@ -112,4 +137,31 @@ canvas {
   border-radius: 16px;
   background: linear-gradient(145deg, #ffffff, #faf8ff);
   box-shadow: 0 8px 25px rgba(142, 36, 170, 0.15);
+}
+
+/* Info section */
+.info {
+  margin-top: 30px;
+  padding: 20px;
+  background: linear-gradient(145deg, #f3e5f5, #ffffff);
+  border-radius: 12px;
+  border: 2px solid #e1bee7;
+}
+
+.info h3 {
+  margin: 0 0 15px 0;
+  color: #6a1b9a;
+  font-size: 16px;
+}
+
+.info ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.info li {
+  margin: 8px 0;
+  color: #4a148c;
+  font-size: 13px;
+  line-height: 1.4;
 }

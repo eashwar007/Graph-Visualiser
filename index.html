@@ -3,32 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tree Visualizer</title>
-  <link rel="stylesheet" href="style.css?v=1.0">
+  <title>Graph Visualizer</title>
+  <link rel="stylesheet" href="style.css?v=2.0">
 </head>
 <body>
   <!-- Left input panel -->
   <div class="sidebar">
-    <h1>🌳 Tree Visualizer</h1>
+    <h1>📊 Graph Visualizer</h1>
 
-    <label for="nodes">Number of Nodes</label>
-    <input type="number" id="nodes" min="1" placeholder="e.g. 5">
+      <label for="nodes">Number of nodes (max 50):</label>
+      <input type="number" id="nodes" min="1" max="50" value="5" required>    <label for="edges">Edges (Optional for disconnected graphs)</label>
+    <textarea id="edges" placeholder="e.g. 1 2, 2 3, 4 5 (nodes can be disconnected)"></textarea>
 
-    <label for="root">Root Node</label>
-    <input type="number" id="root" min="1" placeholder="e.g. 1">
+    <div class="options">
+      <label class="checkbox-container">
+        <input type="checkbox" id="directed" />
+        <span class="checkmark"></span>
+        Directed Graph
+      </label>
+      
+      <label class="checkbox-container">
+        <input type="checkbox" id="showLabels" checked />
+        <span class="checkmark"></span>
+        Show Node Labels
+      </label>
 
-    <label for="edges">Edges</label>
-    <textarea id="edges" placeholder="e.g. 1 2, 1 3, 2 4, 2 5"></textarea>
+      <label class="checkbox-container">
+        <input type="checkbox" id="showBridges" />
+        <span class="checkmark"></span>
+        Show Bridges (Undirected)
+      </label>
 
-    <button class="visualize-btn" onclick="visualizeTree()">🚀 Visualize Tree</button>
+      <label class="checkbox-container">
+        <input type="checkbox" id="showSCC" />
+        <span class="checkmark"></span>
+        Show SCCs (Directed)
+      </label>
+    </div>
+
+    <button class="visualize-btn" onclick="visualizeGraph()">🚀 Visualize Graph</button>
     <p id="error" class="error"></p>
+    
+    <div class="info">
+      <h3>💡 Tips:</h3>
+      <ul>
+        <li>Supports up to 50 nodes for optimal visualization</li>
+        <li>Scroll to zoom in/out</li>
+        <li>Double-click to reset zoom</li>
+        <li>Circular layout for all sizes</li>
+        <li>Bridges shown in red (undirected graphs)</li>
+        <li>SCCs shown in different colors (directed graphs)</li>
+        <li>Smart edge routing avoids node overlaps</li>
+      </ul>
+    </div>
   </div>
 
   <!-- Right canvas output -->
   <div class="main-content">
-    <canvas id="treeCanvas"></canvas>
+    <canvas id="graphCanvas"></canvas>
   </div>
 
-  <script src="script.js?v=1.0"></script>
+  <script src="script.js?v=2.0"></script>
 </body>
 </html>
