@@ -11,16 +11,19 @@ class GraphVisualizer {
     this.showSCC = false;
     this.bridges = [];
     this.sccs = [];
-    this.sccColors = []; // Will be dynamically generated
-    
-    // Zoom and pan properties
+    this.sccColors = [];
+
     this.zoom = 1;
     this.offsetX = 0;
     this.offsetY = 0;
     this.baseRadius = 25;
-    
-    // Setup mouse events for zoom
-    this.setupZoomControls();
+
+    this.isDragging = false;
+    this.dragNode = null;
+    this.mouseX = 0;
+    this.mouseY = 0;
+
+    this.setupControls();
   }
 
   // Generate unlimited distinct colors using HSL color space
@@ -28,19 +31,15 @@ class GraphVisualizer {
     this.sccColors = [];
     
     if (numSCCs === 0) return;
-    
-    // Use golden angle for better color distribution
-    const goldenAngle = 137.508; // degrees
+
+    const goldenAngle = 137.508; 
     
     for (let i = 0; i < numSCCs; i++) {
-      // Distribute hues evenly around color wheel
       const hue = (i * goldenAngle) % 360;
-      
-      // Vary saturation and lightness for better distinction
-      const saturation = 60 + (i % 3) * 15; // 60%, 75%, 90%
-      const lightness = 45 + (i % 4) * 10;  // 45%, 55%, 65%, 75%
-      
-      // Convert HSL to hex color
+
+      const saturation = 60 + (i % 3) * 15;
+      const lightness = 45 + (i % 4) * 10;
+
       const color = this.hslToHex(hue, saturation, lightness);
       this.sccColors.push(color);
     }
@@ -58,7 +57,7 @@ class GraphVisualizer {
     return `#${f(0)}${f(8)}${f(4)}`;
   }
 
-  setupZoomControls() {
+  setupControls() {
     // Mouse wheel zoom
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -68,57 +67,107 @@ class GraphVisualizer {
       const mouseY = e.clientY - rect.top;
       
       if (e.deltaY < 0) {
-        // Zoom in - allow up to 5x zoom
-        this.zoom = Math.min(this.zoom * (1 + zoomFactor), 5);
+        // Zoom in
+        this.zoom = Math.min(this.zoom * (1 + zoomFactor), 2);
       } else {
-        // Zoom out - allow down to 0.05x for very large graphs
-        this.zoom = Math.max(this.zoom * (1 - zoomFactor), 0.05);
+        // Zoom out
+        this.zoom = Math.max(this.zoom * (1 - zoomFactor), 0.2);
       }
       
       this.draw();
     });
 
-    // Double click to reset zoom to optimal for current graph
-    canvas.addEventListener('dblclick', () => {
+    canvas.addEventListener('dblclick', (e) => {
+      if (this.isDragging) return;
+      
       this.zoom = this.calculateOptimalZoom(this.nodes.length);
       this.offsetX = 0;
       this.offsetY = 0;
       this.draw();
     });
+
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - canvas.width / 2) / this.zoom + canvas.width / 2 - this.offsetX;
+      const mouseY = (e.clientY - rect.top - canvas.height / 2) / this.zoom + canvas.height / 2 - this.offsetY;
+
+      const clickedNode = this.getNodeAt(mouseX, mouseY);
+      if (clickedNode) {
+        this.isDragging = true;
+        this.dragNode = clickedNode;
+        this.mouseX = mouseX;
+        this.mouseY = mouseY;
+        canvas.style.cursor = 'grabbing';
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - canvas.width / 2) / this.zoom + canvas.width / 2 - this.offsetX;
+      const mouseY = (e.clientY - rect.top - canvas.height / 2) / this.zoom + canvas.height / 2 - this.offsetY;
+      
+      if (this.isDragging && this.dragNode) {
+        this.dragNode.x = mouseX;
+        this.dragNode.y = mouseY;
+        this.draw();
+      } else {
+        const hoveredNode = this.getNodeAt(mouseX, mouseY);
+        canvas.style.cursor = hoveredNode ? 'grab' : 'default';
+      }
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+      this.isDragging = false;
+      this.dragNode = null;
+      canvas.style.cursor = 'default';
+    });
+
+    canvas.addEventListener('mouseleave', (e) => {
+      this.isDragging = false;
+      this.dragNode = null;
+      canvas.style.cursor = 'default';
+    });
   }
 
-  // Calculate optimal zoom based on number of nodes - simple version
+  // Calculate optimal zoom based on number of nodes
   calculateOptimalZoom(nodeCount) {
     if (nodeCount <= 10) return 1;
     if (nodeCount <= 20) return 0.8;
     if (nodeCount <= 30) return 0.6;
     if (nodeCount <= 40) return 0.5;
-    return 0.4; // For 41-50 nodes
+    return 0.4; 
   }
 
-  // Parse input and create graph
+  // Get node at specific coordinates (for drag detection)
+  getNodeAt(x, y) {
+    for (let node of this.nodes) {
+      const distance = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
+      if (distance <= node.radius) {
+        return node;
+      }
+    }
+    return null;
+  }
+
   parseInput(nodeCount, edgesInput, directed, showLabels, showBridges, showSCC) {
     this.isDirected = directed;
     this.showLabels = showLabels;
-    this.showBridges = showBridges && !directed; // Only for undirected graphs
-    this.showSCC = showSCC && directed; // Only for directed graphs
+    this.showBridges = showBridges && !directed;
+    this.showSCC = showSCC && directed;
     this.nodes = [];
     this.edges = [];
     this.bridges = [];
     this.sccs = [];
 
-    // Create layout for up to 50 nodes - simple circular arrangement
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     const radius = Math.min(centerX, centerY) * 0.7;
-    
-    // Create nodes array first
+
     const nodeDataArray = [];
     for (let i = 1; i <= nodeCount; i++) {
       nodeDataArray.push({ id: i, label: i.toString() });
     }
-    
-    // Simple circular layout
+
     nodeDataArray.forEach((nodeData, index) => {
       const angle = (2 * Math.PI * index) / nodeDataArray.length;
       const x = centerX + radius * Math.cos(angle);
@@ -132,12 +181,9 @@ class GraphVisualizer {
       });
     });
 
-    // Set optimal zoom for the graph size
     this.zoom = this.calculateOptimalZoom(nodeCount);
     this.offsetX = 0;
-    this.offsetY = 0;
 
-    // Parse edges if provided
     if (edgesInput.trim()) {
       const edgeList = edgesInput.split(',').map(e => {
         const parts = e.trim().split(/\s+/).map(Number);
@@ -147,7 +193,6 @@ class GraphVisualizer {
         return parts;
       });
 
-      // Validate and add edges
       for (let [u, v] of edgeList) {
         if (u < 1 || u > nodeCount || v < 1 || v > nodeCount) {
           throw new Error(`Edge contains invalid node: ${u} ${v}. Nodes must be between 1 and ${nodeCount}.`);
@@ -157,7 +202,6 @@ class GraphVisualizer {
       }
     }
 
-    // Run algorithms if requested
     if (this.showBridges && !directed) {
       this.findBridges();
     }
@@ -170,8 +214,7 @@ class GraphVisualizer {
   findBridges() {
     const n = this.nodes.length;
     const adj = Array.from({ length: n + 1 }, () => []);
-    
-    // Build adjacency list for undirected graph
+
     this.edges.forEach(edge => {
       adj[edge.from].push(edge.to);
       adj[edge.to].push(edge.from);
@@ -195,7 +238,6 @@ class GraphVisualizer {
 
           low[u] = Math.min(low[u], low[v]);
 
-          // If low[v] > disc[u], then u-v is a bridge
           if (low[v] > disc[u]) {
             this.bridges.push([u, v]);
           }
@@ -205,7 +247,6 @@ class GraphVisualizer {
       }
     };
 
-    // Find bridges in all components
     for (let i = 1; i <= n; i++) {
       if (!visited[i]) {
         bridgeUtil(i);
@@ -218,8 +259,7 @@ class GraphVisualizer {
     const n = this.nodes.length;
     const adj = Array.from({ length: n + 1 }, () => []);
     const revAdj = Array.from({ length: n + 1 }, () => []);
-    
-    // Build adjacency lists
+
     this.edges.forEach(edge => {
       adj[edge.from].push(edge.to);
       revAdj[edge.to].push(edge.from);
@@ -228,7 +268,6 @@ class GraphVisualizer {
     const visited = Array(n + 1).fill(false);
     const stack = [];
 
-    // First DFS to fill stack with finish times
     const dfs1 = (v) => {
       visited[v] = true;
       for (let u of adj[v]) {
@@ -245,7 +284,6 @@ class GraphVisualizer {
       }
     }
 
-    // Second DFS on reversed graph
     visited.fill(false);
     this.sccs = [];
 
@@ -267,18 +305,14 @@ class GraphVisualizer {
         this.sccs.push(component);
       }
     }
-
-    // Generate colors for all SCCs found
     this.generateSCCColors(this.sccs.length);
   }
 
-  // Create consistent circular layout for all node counts
   createCircularLayout(nodeCount) {
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     
     if (nodeCount === 1) {
-      // Single node in center
       this.nodes.push({
         id: 1,
         x: centerX,
@@ -286,9 +320,7 @@ class GraphVisualizer {
         radius: this.baseRadius
       });
     } else {
-      // Always use circular arrangement - scalable for any number of nodes
-      // Calculate radius based on number of nodes to prevent overlap
-      const minRadius = Math.max(150, nodeCount * 8); // Minimum spacing
+      const minRadius = Math.max(150, nodeCount * 8);
       const maxRadius = Math.min(canvas.width, canvas.height) * 0.4;
       const radius = Math.min(maxRadius, minRadius);
       
@@ -307,22 +339,17 @@ class GraphVisualizer {
   // Draw the graph with zoom and scaling
   draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Apply zoom transformation
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(this.zoom, this.zoom);
     ctx.translate(-canvas.width / 2 + this.offsetX, -canvas.height / 2 + this.offsetY);
     
-    // Draw edges first (so they appear behind nodes)
     this.drawEdges();
-    
-    // Draw nodes on top
+
     this.drawNodes();
     
     ctx.restore();
-    
-    // Draw zoom info
+
     this.drawZoomInfo();
   }
 
@@ -356,61 +383,18 @@ class GraphVisualizer {
       
       // Set edge color
       if (this.showBridges && this.isBridge(edge.from, edge.to)) {
-        ctx.strokeStyle = '#e91e63'; // Red for bridges
+        ctx.strokeStyle = '#e91e63';
         ctx.lineWidth = 4;
       } else {
-        ctx.strokeStyle = '#8e24aa'; // Default purple
+        ctx.strokeStyle = '#8e24aa';
         ctx.lineWidth = 2;
       }
+      this.drawStraightEdge(nodeA, nodeB);
       
-      // Check if edge intersects with other nodes and draw curved if needed
-      if (this.edgeIntersectsNodes(nodeA, nodeB)) {
-        this.drawCurvedEdge(nodeA, nodeB, true); // true indicates we need arrow direction
-      } else {
-        this.drawStraightEdge(nodeA, nodeB);
-        // Draw arrow for directed graphs (only for straight edges)
-        if (this.isDirected) {
-          this.drawArrow(nodeA, nodeB);
-        }
+      if (this.isDirected) {
+        this.drawArrow(nodeA, nodeB);
       }
     });
-  }
-
-  // Check if a straight line between two nodes intersects with other nodes
-  edgeIntersectsNodes(nodeA, nodeB) {
-    for (let node of this.nodes) {
-      // Skip the endpoint nodes
-      if (node.id === nodeA.id || node.id === nodeB.id) continue;
-      
-      // Check if the line segment intersects with this node's circle
-      if (this.lineIntersectsCircle(nodeA, nodeB, node)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // Check if line segment intersects with a circle (node)
-  lineIntersectsCircle(nodeA, nodeB, circleNode) {
-    const dx = nodeB.x - nodeA.x;
-    const dy = nodeB.y - nodeA.y;
-    const fx = nodeA.x - circleNode.x;
-    const fy = nodeA.y - circleNode.y;
-    
-    const a = dx * dx + dy * dy;
-    const b = 2 * (fx * dx + fy * dy);
-    const c = fx * fx + fy * fy - (circleNode.radius + 10) * (circleNode.radius + 10); // Add 10px buffer
-    
-    const discriminant = b * b - 4 * a * c;
-    
-    if (discriminant < 0) return false; // No intersection
-    
-    const sqrt_discriminant = Math.sqrt(discriminant);
-    const t1 = (-b - sqrt_discriminant) / (2 * a);
-    const t2 = (-b + sqrt_discriminant) / (2 * a);
-    
-    // Check if intersection points are within the line segment
-    return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1);
   }
 
   // Draw straight edge
@@ -419,41 +403,6 @@ class GraphVisualizer {
     ctx.moveTo(nodeA.x, nodeA.y);
     ctx.lineTo(nodeB.x, nodeB.y);
     ctx.stroke();
-  }
-
-  // Draw curved edge to avoid intersecting nodes
-  drawCurvedEdge(nodeA, nodeB, drawArrow = false) {
-    const midX = (nodeA.x + nodeB.x) / 2;
-    const midY = (nodeA.y + nodeB.y) / 2;
-    
-    // Calculate perpendicular offset for curve
-    const dx = nodeB.x - nodeA.x;
-    const dy = nodeB.y - nodeA.y;
-    const length = Math.sqrt(dx * dx + dy * dy);
-    
-    if (length === 0) return;
-    
-    // Perpendicular vector (rotated 90 degrees)
-    const perpX = -dy / length;
-    const perpY = dx / length;
-    
-    // Curve offset (30% of the distance between nodes)
-    const offset = Math.min(80, length * 0.3);
-    
-    // Control point for quadratic curve
-    const controlX = midX + perpX * offset;
-    const controlY = midY + perpY * offset;
-    
-    // Draw quadratic curve
-    ctx.beginPath();
-    ctx.moveTo(nodeA.x, nodeA.y);
-    ctx.quadraticCurveTo(controlX, controlY, nodeB.x, nodeB.y);
-    ctx.stroke();
-    
-    // Draw arrow for curved edge if needed
-    if (drawArrow && this.isDirected) {
-      this.drawCurvedArrow(nodeA, nodeB, controlX, controlY);
-    }
   }
 
   drawSelfLoop(node, isBridge = false) {
@@ -508,59 +457,21 @@ class GraphVisualizer {
     ctx.stroke();
   }
 
-  // Draw arrow for curved edges - calculates tangent direction at the end of the curve
-  drawCurvedArrow(from, to, controlX, controlY) {
-    // Calculate the tangent direction at the end of the quadratic curve
-    // For quadratic Bezier curve, the tangent at t=1 is: 2 * (P2 - P1)
-    // where P1 is control point and P2 is end point
-    const tangentX = 2 * (to.x - controlX);
-    const tangentY = 2 * (to.y - controlY);
-    const tangentLength = Math.sqrt(tangentX * tangentX + tangentY * tangentY);
-    
-    if (tangentLength === 0) return;
-    
-    const unitTangentX = tangentX / tangentLength;
-    const unitTangentY = tangentY / tangentLength;
-    
-    // Position arrow near the target node along the curve direction
-    const arrowX = to.x - unitTangentX * (to.radius + 5);
-    const arrowY = to.y - unitTangentY * (to.radius + 5);
-    
-    const arrowLength = 15;
-    const arrowAngle = Math.PI / 6;
-    const tangentAngle = Math.atan2(unitTangentY, unitTangentX);
-    
-    ctx.beginPath();
-    ctx.moveTo(arrowX, arrowY);
-    ctx.lineTo(
-      arrowX - arrowLength * Math.cos(tangentAngle - arrowAngle),
-      arrowY - arrowLength * Math.sin(tangentAngle - arrowAngle)
-    );
-    ctx.moveTo(arrowX, arrowY);
-    ctx.lineTo(
-      arrowX - arrowLength * Math.cos(tangentAngle + arrowAngle),
-      arrowY - arrowLength * Math.sin(tangentAngle + arrowAngle)
-    );
-    ctx.stroke();
-  }
-
   getNodeSCCColor(nodeId) {
     if (!this.showSCC) return '#ab47bc';
     
     for (let i = 0; i < this.sccs.length; i++) {
       if (this.sccs[i].includes(nodeId)) {
-        return this.sccColors[i]; // Now guaranteed to exist
+        return this.sccColors[i];
       }
     }
-    return '#ab47bc'; // Default color for nodes not in any SCC
+    return '#ab47bc';
   }
 
   drawNodes() {
     this.nodes.forEach(node => {
-      // Calculate scaled radius
       const scaledRadius = node.radius * Math.max(0.5, Math.min(1, this.zoom));
-      
-      // Node circle with SCC coloring if enabled
+
       ctx.beginPath();
       ctx.arc(node.x, node.y, scaledRadius, 0, 2 * Math.PI);
       ctx.fillStyle = this.getNodeSCCColor(node.id);
@@ -595,40 +506,34 @@ function visualizeGraph() {
 
   errorEl.textContent = "";
 
-  // Resize canvas dynamically
   canvas.width = canvas.parentElement.clientWidth - 40;
   canvas.height = canvas.parentElement.clientHeight - 40;
 
-  // Basic validation
   if (isNaN(nodes) || nodes <= 0) {
-    errorEl.textContent = "⚠️ Please enter a valid number of nodes (positive integer).";
+    errorEl.textContent = "Please enter a valid number of nodes (positive integer).";
     return;
   }
 
   if (nodes > 50) {
-    errorEl.textContent = "⚠️ Please enter 50 or fewer nodes for optimal visualization.";
+    errorEl.textContent = "Please enter 50 or fewer nodes for optimal visualization.";
     return;
   }
 
-  // Validate algorithm selections
   if (showBridges && directed) {
-    errorEl.textContent = "⚠️ Bridge detection only works with undirected graphs.";
+    errorEl.textContent = "Bridge detection only works with undirected graphs.";
     return;
   }
 
   if (showSCC && !directed) {
-    errorEl.textContent = "⚠️ SCC detection only works with directed graphs.";
+    errorEl.textContent = "SCC detection only works with directed graphs.";
     return;
   }
 
   try {
-    // Parse and create graph
     graphViz.parseInput(nodes, edgesInput, directed, showLabels, showBridges, showSCC);
     
-    // Draw graph with automatic zoom
     graphViz.draw();
     
-    // Display algorithm results
     if (showBridges && graphViz.bridges.length > 0) {
       console.log('Bridges found:', graphViz.bridges);
     }
@@ -638,7 +543,7 @@ function visualizeGraph() {
     }
     
   } catch (error) {
-    errorEl.textContent = `⚠️ ${error.message}`;
+    errorEl.textContent = `${error.message}`;
   }
 }
 
