@@ -18,11 +18,19 @@ class GraphVisualizer {
     this.offsetY = 0;
     this.baseRadius = 25;
 
+    // Drag properties
     this.isDragging = false;
     this.dragNode = null;
     this.mouseX = 0;
     this.mouseY = 0;
-
+    
+    // Animation properties
+    this.isAnimating = false;
+    this.animationQueue = [];
+    this.visitedNodes = new Set();
+    this.currentlyVisiting = null;
+    
+    // Setup controls
     this.setupControls();
   }
 
@@ -183,6 +191,7 @@ class GraphVisualizer {
 
     this.zoom = this.calculateOptimalZoom(nodeCount);
     this.offsetX = 0;
+    this.offsetY = 0;
 
     if (edgesInput.trim()) {
       const edgeList = edgesInput.split(',').map(e => {
@@ -306,6 +315,117 @@ class GraphVisualizer {
       }
     }
     this.generateSCCColors(this.sccs.length);
+  }
+
+  // BFS Algorithm with Animation
+  async runBFS(startNode) {
+    if (this.isAnimating) return;
+    
+    this.isAnimating = true;
+    this.visitedNodes.clear();
+    this.currentlyVisiting = null;
+
+    const adj = this.buildAdjacencyList();
+    const queue = [startNode];
+    const visited = new Set();
+    
+    while (queue.length > 0 && this.isAnimating) {
+      const current = queue.shift();
+      
+      if (visited.has(current)) continue;
+
+      this.currentlyVisiting = current;
+      this.visitedNodes.add(current);
+      visited.add(current);
+      this.draw();
+
+      await this.sleep(800);
+
+      for (let neighbor of adj[current] || []) {
+        if (!visited.has(neighbor)) {
+          queue.push(neighbor);
+        }
+      }
+    }
+    
+    this.currentlyVisiting = null;
+    this.isAnimating = false;
+    this.draw();
+    
+    // Auto-reset colors after 2 seconds
+    await this.sleep(2000);
+    this.visitedNodes.clear();
+    this.draw();
+  }
+
+  // DFS Algorithm with Animation
+  async runDFS(startNode) {
+    if (this.isAnimating) return;
+    
+    this.isAnimating = true;
+    this.visitedNodes.clear();
+    this.currentlyVisiting = null;
+    
+    const adj = this.buildAdjacencyList();
+    const visited = new Set();
+    
+    await this.dfsVisit(startNode, visited, adj);
+    
+    this.currentlyVisiting = null;
+    this.isAnimating = false;
+    this.draw();
+    
+    // Auto-reset colors after 2 seconds
+    await this.sleep(2000);
+    this.visitedNodes.clear();
+    this.draw();
+  }
+
+  // Recursive DFS helper
+  async dfsVisit(node, visited, adj) {
+    if (!this.isAnimating || visited.has(node)) return;
+
+    this.currentlyVisiting = node;
+    this.visitedNodes.add(node);
+    visited.add(node);
+    this.draw();
+
+    await this.sleep(800);
+
+    for (let neighbor of adj[node] || []) {
+      if (!visited.has(neighbor)) {
+        await this.dfsVisit(neighbor, visited, adj);
+      }
+    }
+  }
+
+  buildAdjacencyList() {
+    const adj = {};
+
+    for (let i = 1; i <= this.nodes.length; i++) {
+      adj[i] = [];
+    }
+
+    this.edges.forEach(edge => {
+      adj[edge.from].push(edge.to);
+
+      if (!this.isDirected) {
+        adj[edge.to].push(edge.from);
+      }
+    });
+    
+    return adj;
+  }
+
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  stopAnimation() {
+    this.isAnimating = false;
+    this.visitedNodes.clear();
+    this.currentlyVisiting = null;
+    this.draw();
   }
 
   createCircularLayout(nodeCount) {
@@ -435,8 +555,7 @@ class GraphVisualizer {
     
     const unitX = dx / length;
     const unitY = dy / length;
-    
-    // Position arrow near the target node
+
     const arrowX = to.x - unitX * (to.radius + 5);
     const arrowY = to.y - unitY * (to.radius + 5);
     
@@ -472,15 +591,40 @@ class GraphVisualizer {
     this.nodes.forEach(node => {
       const scaledRadius = node.radius * Math.max(0.5, Math.min(1, this.zoom));
 
+      let nodeColor = this.getNodeSCCColor(node.id);
+      let glowColor = null;
+      let strokeColor = '#6a1b9a';
+      let strokeWidth = 3;
+      
+      if (this.currentlyVisiting === node.id) {
+        nodeColor = '#ff9800';
+        glowColor = '#ff9800';
+        strokeColor = '#ff6f00';
+        strokeWidth = 5;
+      } else if (this.visitedNodes.has(node.id)) {
+        nodeColor = '#4caf50';
+        glowColor = '#4caf50';
+        strokeColor = '#388e3c';
+        strokeWidth = 4;
+      }
+
+      if (glowColor) {
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      }
+
       ctx.beginPath();
       ctx.arc(node.x, node.y, scaledRadius, 0, 2 * Math.PI);
-      ctx.fillStyle = this.getNodeSCCColor(node.id);
+      ctx.fillStyle = nodeColor;
       ctx.fill();
-      ctx.strokeStyle = '#6a1b9a';
-      ctx.lineWidth = 3;
+
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth;
       ctx.stroke();
-      
-      // Node label with scaled font
+
       if (this.showLabels) {
         ctx.fillStyle = 'white';
         const fontSize = Math.max(10, 16 * Math.max(0.5, Math.min(1, this.zoom)));
@@ -541,10 +685,51 @@ function visualizeGraph() {
     if (showSCC && graphViz.sccs.length > 0) {
       console.log('Strongly Connected Components:', graphViz.sccs);
     }
+    // Show algorithm buttons after successful visualization
+    document.getElementById('algorithmButtons').style.display = 'block';
+    
+    // Set max value for start node input
+    const startNodeInput = document.getElementById('startNode');
+    startNodeInput.max = nodes;
     
   } catch (error) {
     errorEl.textContent = `${error.message}`;
+    // Hide algorithm buttons on error
+    document.getElementById('algorithmButtons').style.display = 'none';
   }
+}
+
+// Global functions for algorithm buttons
+function runBFS() {
+  const startNode = parseInt(document.getElementById('startNode').value);
+  const maxNode = graphViz.nodes.length;
+  
+  if (startNode < 1 || startNode > maxNode) {
+    alert(`Start node must be between 1 and ${maxNode}`);
+    return;
+  }
+  
+  // Stop any current animation
+  graphViz.stopAnimation();
+  
+  // Run BFS animation
+  graphViz.runBFS(startNode);
+}
+
+function runDFS() {
+  const startNode = parseInt(document.getElementById('startNode').value);
+  const maxNode = graphViz.nodes.length;
+  
+  if (startNode < 1 || startNode > maxNode) {
+    alert(`Start node must be between 1 and ${maxNode}`);
+    return;
+  }
+  
+  // Stop any current animation
+  graphViz.stopAnimation();
+  
+  // Run DFS animation
+  graphViz.runDFS(startNode);
 }
 
 

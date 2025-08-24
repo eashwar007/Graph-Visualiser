@@ -7,12 +7,13 @@
   <link rel="stylesheet" href="style.css?v=2.0">
 </head>
 <body>
-  <!-- Left input panel -->
   <div class="sidebar">
     <h1>Graph Visualizer</h1>
 
-      <label for="nodes">Number of nodes (max 50):</label>
-      <input type="number" id="nodes" min="1" max="50" value="5" required>    <label for="edges">Edges (Optional for disconnected graphs)</label>
+    <label for="nodes">Number of nodes (max 50):</label>
+    <input type="number" id="nodes" min="1" max="50" value="5" required>
+    
+    <label for="edges">Edges (Optional for disconnected graphs)</label>
     <textarea id="edges" placeholder="e.g. 1 2, 2 3, 4 5 (nodes can be disconnected)"></textarea>
 
     <div class="options">
@@ -43,6 +44,17 @@
 
     <button class="visualize-btn" onclick="visualizeGraph()">Visualize Graph</button>
     <p id="error" class="error"></p>
+    <div id="algorithmButtons" style="display: none;">
+      <h3 style="color: #6a1b9a; margin: 20px 0 10px 0;">Algorithm Animations:</h3>
+      <div style="display: flex; gap: 10px; flex-direction: column;">
+        <button class="algorithm-btn" onclick="runBFS()">Run BFS Traversal</button>
+        <button class="algorithm-btn" onclick="runDFS()">Run DFS Traversal</button>
+        <div style="margin-top: 10px;">
+          <label for="startNode" style="font-size: 14px;">Start from node:</label>
+          <input type="number" id="startNode" min="1" value="1" style="width: 60px; margin-left: 8px;">
+        </div>
+      </div>
+    </div>
     
     <div class="info">
       <h3>Tips:</h3>
@@ -51,14 +63,13 @@
         <li>Drag nodes to reposition them freely</li>
         <li>Scroll to zoom in/out</li>
         <li>Double-click to reset zoom</li>
+        <li>Run BFS/DFS animations with glowing effects</li>
         <li>Circular layout for all sizes</li>
         <li>Bridges shown in red (undirected graphs)</li>
         <li>SCCs shown in different colors (directed graphs)</li>
       </ul>
     </div>
   </div>
-
-  <!-- Right canvas output -->
   <div class="main-content">
     <canvas id="graphCanvas"></canvas>
   </div>
